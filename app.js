@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://qzwuptmldyksjlcynrcy.supabase.co';
-const SUPABASE_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_PUBLISHABLE_KEY';
+const SUPABASE_KEY = 'sb_publishable_41R3PSkaLqwvgrnRg38spw_0ytE-OPD';
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -440,7 +440,75 @@ function removeCart(i) {
   render();
 }
 
-function demoOrder() {
+async function demoOrder() {
+  const emailEl = document.getElementById('email');
+  const nameEl = document.getElementById('name');
+
+  const email = emailEl?.value.trim();
+  const name = nameEl?.value.trim();
+
+  if (!email) {
+    return toast('Укажи email');
+  }
+
+  if (!cart.length) {
+    return toast('Корзина пуста');
+  }
+
+  const button = document.querySelector('.form .btn');
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Создаём заказ...';
+  }
+
+  try {
+    const items = cart.map(p => ({
+      product_id: p.id
+    }));
+
+    const { data, error } = await supabaseClient.functions.invoke(
+      'create-order',
+      {
+        body: {
+          email,
+          name,
+          items
+        }
+      }
+    );
+
+    if (error) {
+      console.error(error);
+      throw new Error('Ошибка создания заказа');
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || 'Не удалось создать заказ');
+    }
+
+    localStorage.setItem(
+      'kf_last_order',
+      JSON.stringify(data)
+    );
+
+    cart = [];
+    save();
+
+    toast('Заказ создан');
+
+    location.hash = '/orders';
+
+  } catch (error) {
+    console.error(error);
+    toast(error.message || 'Ошибка');
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Создать заказ';
+    }
+  }
+}
   const email = document.getElementById('email');
 
   if (!email || !email.value) {
