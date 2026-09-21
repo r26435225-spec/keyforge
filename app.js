@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://qzwuptmldyksjlcynrcy.supabase.co';
-const SUPABASE_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_PUBLISHABLE_KEY';
+const SUPABASE_KEY = sb_publishable_41R3PSkaLqwvgrnRg38spw_0ytE-OPD;
 
 let supabaseClient;
 let products = [];
