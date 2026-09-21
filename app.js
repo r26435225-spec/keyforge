@@ -1,40 +1,81 @@
 const SUPABASE_URL = 'https://qzwuptmldyksjlcynrcy.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_41R3PSkaLqwvgrnRg38spw_0ytE-OPD';
+const SUPABASE_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_PUBLISHABLE_KEY';
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
-
+let supabaseClient;
 let products = [];
 let cart = JSON.parse(localStorage.getItem('kf_cart') || '[]');
-let filter = 'all';
-let query = '';
 
-const money = n => Number(n).toLocaleString('ru-RU') + ' ₽';
+const money = n =>
+  Number(n).toLocaleString('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + ' ₽';
 
-function save() {
+function saveCart() {
   localStorage.setItem('kf_cart', JSON.stringify(cart));
-  const counter = document.getElementById('cartCount');
-  if (counter) counter.textContent = cart.length;
+  updateCartCount();
 }
 
-function toast(t) {
+function updateCartCount() {
+  const el = document.getElementById('cartCount');
+  if (el) el.textContent = cart.length;
+}
+
+function toast(text) {
   const el = document.getElementById('toast');
   if (!el) return;
-  el.textContent = t;
-  setTimeout(() => el.textContent = '', 2200);
+  el.textContent = text;
+  setTimeout(() => {
+    el.textContent = '';
+  }, 2500);
+}
+
+function initSupabase() {
+  if (!window.supabase) {
+    document.getElementById('app').innerHTML = `
+      <section class="section">
+        <h2>Ошибка загрузки</h2>
+        <p>Не загрузилась библиотека Supabase.</p>
+      </section>
+    `;
+    return false;
+  }
+
+  if (SUPABASE_KEY === 'ВСТАВЬ_СЮДА_СВОЙ_PUBLISHABLE_KEY') {
+    document.getElementById('app').innerHTML = `
+      <section class="section">
+        <h2>Нужно указать ключ Supabase</h2>
+        <p>Открой app.js и вставь свой Publishable key.</p>
+      </section>
+    `;
+    return false;
+  }
+
+  supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+
+  return true;
 }
 
 async function loadProducts() {
+  if (!supabaseClient) return;
+
   const { data, error } = await supabaseClient
     .from('products')
     .select('*')
     .order('id', { ascending: true });
 
   if (error) {
-    console.error(error);
-    toast('Ошибка загрузки каталога');
+    console.error('Supabase error:', error);
+
+    document.getElementById('app').innerHTML = `
+      <section class="section">
+        <h2>Не удалось загрузить каталог</h2>
+        <p>Проверь подключение Supabase и Publishable key.</p>
+      </section>
+    `;
     return;
   }
 
@@ -55,523 +96,173 @@ async function loadProducts() {
 
 function card(p) {
   return `
-  <article class="card">
-    <a href="#/product/${p.id}">
-      <div class="cover">${p.icon}</div>
-    </a>
-    <div class="card-body">
-      <span class="tag">${p.platform} · ${p.region}</span>
-      <h3>${p.name}</h3>
-      <p>${p.desc}</p>
-      <div class="row">
-        <strong>${money(p.price)}</strong>
-        <button class="smallbtn"
-          onclick="add(${p.id});event.preventDefault()">
-          В корзину
-        </button>
+    <article class="card">
+      <a href="#/product/${p.id}">
+        <div class="cover">${p.icon}</div>
+      </a>
+
+      <div class="card-body">
+        <span class="tag">${p.platform} · ${p.region}</span>
+
+        <h3>${p.name}</h3>
+
+        <p>${p.desc}</p>
+
+        <div class="row">
+          <strong>${money(p.price)}</strong>
+
+          ${
+            p.old
+              ? `<del>${money(p.old)}</del>`
+              : ''
+          }
+
+          <button
+            class="smallbtn"
+            onclick="addToCart(${p.id}); event.preventDefault();"
+          >
+            В корзину
+          </button>
+        </div>
       </div>
-    </div>
-  </article>`;
+    </article>
+  `;
 }
 
 function home() {
+  const featured = products.slice(0, 8);
+
   return `
-  <section class="wrap hero">
-    <div>
-      <div class="eyebrow">KeyForge</div>
-      <h1>Игры дешевле.<br><span>Покупка проще.</span></h1>
-      <p class="muted">
-        Каталог цифровых игр, понятные цены и удобная покупка в одном месте.
-      </p>
-      <a class="btn" href="#/catalog">Открыть каталог</a>
-      <a class="btn alt" href="#/deals">Скидки</a>
-    </div>
-
-    <div class="showcase">
-      <div class="bigcover">🎮</div>
-      <h2>Игра недели</h2>
-      <p class="muted">Cyberpunk 2077 · Steam · Global</p>
-      <div class="row">
-        <span class="price">899 ₽</span>
-        <a class="smallbtn" href="#/product/1">Подробнее</a>
-      </div>
-    </div>
-  </section>
-
-  <section class="wrap">
-    <div class="section-title">
+    <section class="hero">
       <div>
-        <span class="eyebrow">Популярное</span>
-        <h2>Лучшие предложения</h2>
-      </div>
-      <a href="#/catalog">Все игры →</a>
-    </div>
+        <span class="tag">KEYFORGE</span>
+        <h1>Игры дешевле.<br>Покупка проще.</h1>
+        <p>
+          Цифровые игры для Steam, EA и Ubisoft.
+          Быстрая покупка и доставка ключа.
+        </p>
 
-    <div class="cards">
-      ${products.slice(0, 4).map(card).join('')}
-    </div>
-  </section>`;
+        <a class="btn" href="#/catalog">
+          Смотреть каталог
+        </a>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Популярные игры</h2>
+        <a href="#/catalog">Весь каталог →</a>
+      </div>
+
+      <div class="grid">
+        ${
+          featured.length
+            ? featured.map(card).join('')
+            : '<p>Загрузка каталога...</p>'
+        }
+      </div>
+    </section>
+  `;
 }
 
 function catalog() {
-  const list = products.filter(p =>
-    (filter === 'all' || p.platform === filter) &&
-    p.name.toLowerCase().includes(query.toLowerCase())
-  );
-
   return `
-  <section class="wrap">
-    <div class="section-title">
-      <div>
-        <span class="eyebrow">Каталог</span>
-        <h2>Все игры</h2>
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <span class="tag">МАГАЗИН</span>
+          <h2>Каталог игр</h2>
+        </div>
       </div>
-    </div>
 
-    <div class="toolbar">
-      <input
-        placeholder="🔍 Поиск игры..."
-        value="${query}"
-        oninput="query=this.value;render()"
-      >
-
-      <div class="chips">
-        <button class="chip ${filter === 'all' ? 'active' : ''}"
-          onclick="filter='all';render()">Все</button>
-
-        <button class="chip ${filter === 'Steam' ? 'active' : ''}"
-          onclick="filter='Steam';render()">Steam</button>
-
-        <button class="chip ${filter === 'EA' ? 'active' : ''}"
-          onclick="filter='EA';render()">EA</button>
-
-        <button class="chip ${filter === 'Ubisoft' ? 'active' : ''}"
-          onclick="filter='Ubisoft';render()">Ubisoft</button>
+      <div class="grid">
+        ${
+          products.length
+            ? products.map(card).join('')
+            : '<p>Игры не найдены.</p>'
+        }
       </div>
-    </div>
-
-    <div class="cards">
-      ${
-        list.length
-          ? list.map(card).join('')
-          : '<div class="empty" style="grid-column:1/-1">Ничего не найдено</div>'
-      }
-    </div>
-  </section>`;
+    </section>
+  `;
 }
 
-function product(id) {
-  const p = products.find(x => x.id == id);
+function productPage(id) {
+  const p = products.find(x => x.id === Number(id));
 
   if (!p) {
     return `
-    <section class="wrap">
-      <div class="empty">
+      <section class="section">
         <h2>Товар не найден</h2>
-        <a class="btn" href="#/catalog">Каталог</a>
-      </div>
-    </section>`;
+        <a href="#/catalog">Вернуться в каталог</a>
+      </section>
+    `;
   }
 
   return `
-  <section class="wrap product-page">
-    <div class="cover">${p.icon}</div>
+    <section class="section">
+      <a href="#/catalog">← Назад в каталог</a>
 
-    <div class="panel">
-      <span class="tag">${p.platform} · цифровой ключ</span>
+      <div class="product-page">
+        <div class="cover big">${p.icon}</div>
 
-      <h1>${p.name}</h1>
-      <p class="muted">${p.desc}</p>
-
-      <div class="specs">
-        <div class="spec">
-          <small>Платформа</small>${p.platform}
-        </div>
-        <div class="spec">
-          <small>Регион</small>${p.region}
-        </div>
-        <div class="spec">
-          <small>Жанр</small>${p.genre}
-        </div>
-        <div class="spec">
-          <small>Выдача</small>После оплаты
-        </div>
-      </div>
-
-      <div class="order">
         <div>
-          <div class="muted">Цена</div>
-          <div class="total">${money(p.price)}</div>
-        </div>
+          <span class="tag">${p.platform} · ${p.region}</span>
 
-        <button class="btn" onclick="add(${p.id})">
-          Добавить в корзину
-        </button>
+          <h1>${p.name}</h1>
+
+          <p>${p.desc}</p>
+
+          <p><b>Жанр:</b> ${p.genre}</p>
+          <p><b>Регион:</b> ${p.region}</p>
+          <p><b>Платформа:</b> ${p.platform}</p>
+
+          <h2>${money(p.price)}</h2>
+
+          ${
+            p.old
+              ? `<p><del>${money(p.old)}</del></p>`
+              : ''
+          }
+
+          <button class="btn" onclick="addToCart(${p.id})">
+            Добавить в корзину
+          </button>
+        </div>
       </div>
-    </div>
-  </section>`;
+    </section>
+  `;
+}
+
+function addToCart(id) {
+  const p = products.find(x => x.id === Number(id));
+
+  if (!p) return;
+
+  cart.push(p);
+  saveCart();
+
+  toast('Товар добавлен в корзину');
+}
+
+function removeFromCart(index) {
+  cart.splice(index, 1);
+  saveCart();
+  render();
 }
 
 function cartPage() {
   if (!cart.length) {
     return `
-    <section class="wrap">
-      <div class="empty">
-        <h2>Корзина пуста</h2>
-        <p class="muted">Добавь игру из каталога.</p>
+      <section class="section">
+        <h1>Корзина</h1>
+        <p>Корзина пуста.</p>
         <a class="btn" href="#/catalog">Перейти в каталог</a>
-      </div>
-    </section>`;
+      </section>
+    `;
   }
 
-  const total = cart.reduce((s, p) => s + p.price, 0);
+  const total = cart.reduce((sum, p) => sum + p.price, 0);
 
   return `
-  <section class="wrap">
-    <div class="section-title">
-      <div>
-        <span class="eyebrow">Покупка</span>
-        <h2>Корзина</h2>
-      </div>
-    </div>
-
-    <div class="checkout-grid">
-      <div class="panel">
-        ${cart.map((p, i) => `
-          <div class="cartline">
-            <div class="carticon">${p.icon}</div>
-
-            <div style="flex:1">
-              <b>${p.name}</b>
-              <div class="muted">${p.platform} · ${p.region}</div>
-            </div>
-
-            <strong>${money(p.price)}</strong>
-
-            <button class="smallbtn"
-              onclick="removeCart(${i})">×</button>
-          </div>
-        `).join('')}
-      </div>
-
-      <div class="panel">
-        <h2>Итого</h2>
-
-        <div class="row">
-          <span class="muted">${cart.length} товар(а)</span>
-          <span class="total">${money(total)}</span>
-        </div>
-
-        <a class="btn"
-          style="width:100%;text-align:center"
-          href="#/checkout">
-          Перейти к оформлению
-        </a>
-      </div>
-    </div>
-  </section>`;
-}
-
-function checkout() {
-  const total = cart.reduce((s, p) => s + p.price, 0);
-
-  return `
-  <section class="wrap">
-    <div class="section-title">
-      <div>
-        <span class="eyebrow">Оформление</span>
-        <h2>Данные заказа</h2>
-      </div>
-    </div>
-
-    <div class="checkout-grid">
-      <div class="panel">
-        <div class="form">
-          <label>
-            Email
-            <input id="email"
-              type="email"
-              placeholder="you@example.com">
-          </label>
-
-          <label>
-            Имя
-            <input id="name"
-              placeholder="Ваше имя">
-          </label>
-
-          <div class="notice">
-            💳 Реальная оплата будет подключена следующим этапом.
-          </div>
-
-          <button class="btn" onclick="demoOrder()">
-            Создать тестовый заказ
-          </button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h3>Ваш заказ</h3>
-
-        ${cart.map(p => `
-          <div class="row" style="margin:10px 0">
-            <span>${p.name}</span>
-            <b>${money(p.price)}</b>
-          </div>
-        `).join('')}
-
-        <hr>
-
-        <div class="row">
-          <b>Итого</b>
-          <span class="total">${money(total)}</span>
-        </div>
-      </div>
-    </div>
-  </section>`;
-}
-
-function account() {
-  const orders = JSON.parse(
-    localStorage.getItem('kf_orders') || '[]'
-  );
-
-  return `
-  <section class="wrap account">
-    <aside class="side">
-      <a href="#/account">👤 Профиль</a>
-      <a href="#/orders">📦 Заказы</a>
-      <a href="#/catalog">🎮 Каталог</a>
-    </aside>
-
-    <div>
-      <span class="eyebrow">Личный кабинет</span>
-      <h2>Мой KeyForge</h2>
-
-      <div class="panel">
-        <h3>Добро пожаловать</h3>
-        <p class="muted">
-          Здесь будут профиль, история заказов и цифровые товары.
-        </p>
-        <p>Заказов: <b>${orders.length}</b></p>
-      </div>
-    </div>
-  </section>`;
-}
-
-function orders() {
-  const o = JSON.parse(
-    localStorage.getItem('kf_orders') || '[]'
-  );
-
-  return `
-  <section class="wrap">
-    <span class="eyebrow">Личный кабинет</span>
-    <h2>Мои заказы</h2>
-
-    ${
-      o.length
-      ? o.map(x => `
-        <div class="panel" style="margin:12px 0">
-          <div class="row">
-            <b>Заказ ${x.id}</b>
-            <span>${x.date}</span>
-          </div>
-          <p>${x.items.join(', ')}</p>
-          <span class="tag">Тестовый заказ</span>
-        </div>
-      `).join('')
-      : '<div class="empty">Заказов пока нет.</div>'
-    }
-  </section>`;
-}
-
-function support() {
-  return `
-  <section class="wrap">
-    <div class="panel">
-      <span class="eyebrow">Помощь</span>
-      <h1>Поддержка</h1>
-
-      <div class="form">
-        <input placeholder="Email">
-        <input placeholder="Номер заказа">
-        <input placeholder="Тема">
-
-        <textarea
-          style="min-height:140px"
-          placeholder="Сообщение">
-        </textarea>
-
-        <button class="btn"
-          onclick="toast('Сообщение отправлено')">
-          Отправить
-        </button>
-      </div>
-    </div>
-  </section>`;
-}
-
-function deals() {
-  return `
-  <section class="wrap">
-    <span class="eyebrow">Выгодно</span>
-    <h2>Скидки</h2>
-
-    <div class="cards">
-      ${products.filter(p => p.old > p.price).map(card).join('')}
-    </div>
-  </section>`;
-}
-
-function add(id) {
-  const p = products.find(x => x.id == id);
-
-  if (!p) return;
-
-  cart.push(p);
-  save();
-  toast('Добавлено в корзину');
-}
-
-function removeCart(i) {
-  cart.splice(i, 1);
-  save();
-  render();
-}
-
-async function demoOrder() {
-  const emailEl = document.getElementById('email');
-  const nameEl = document.getElementById('name');
-
-  const email = emailEl?.value.trim();
-  const name = nameEl?.value.trim();
-
-  if (!email) {
-    return toast('Укажи email');
-  }
-
-  if (!cart.length) {
-    return toast('Корзина пуста');
-  }
-
-  const button = document.querySelector('.form .btn');
-
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Создаём заказ...';
-  }
-
-  try {
-    const items = cart.map(p => ({
-      product_id: p.id
-    }));
-
-    const { data, error } = await supabaseClient.functions.invoke(
-      'create-order',
-      {
-        body: {
-          email,
-          name,
-          items
-        }
-      }
-    );
-
-    if (error) {
-      console.error(error);
-      throw new Error('Ошибка создания заказа');
-    }
-
-    if (!data?.success) {
-      throw new Error(data?.error || 'Не удалось создать заказ');
-    }
-
-    localStorage.setItem(
-      'kf_last_order',
-      JSON.stringify(data)
-    );
-
-    cart = [];
-    save();
-
-    toast('Заказ создан');
-
-    location.hash = '/orders';
-
-  } catch (error) {
-    console.error(error);
-    toast(error.message || 'Ошибка');
-
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Создать заказ';
-    }
-  }
-}
-  const email = document.getElementById('email');
-
-  if (!email || !email.value) {
-    return toast('Укажи email');
-  }
-
-  const orders = JSON.parse(
-    localStorage.getItem('kf_orders') || '[]'
-  );
-
-  orders.push({
-    id: '#KF' + Date.now().toString().slice(-6),
-    date: new Date().toLocaleString('ru-RU'),
-    items: cart.map(p => p.name)
-  });
-
-  localStorage.setItem(
-    'kf_orders',
-    JSON.stringify(orders)
-  );
-
-  cart = [];
-  save();
-
-  location.hash = '/orders';
-}
-
-function openSearch() {
-  location.hash = '/catalog';
-}
-
-function render() {
-  save();
-
-  const path = location.hash.slice(1) || '/';
-
-  let c;
-
-  if (path === '/') c = home();
-  else if (path === '/catalog') c = catalog();
-  else if (path === '/cart') c = cartPage();
-  else if (path === '/checkout') c = checkout();
-  else if (path === '/account') c = account();
-  else if (path === '/orders') c = orders();
-  else if (path === '/support') c = support();
-  else if (path === '/deals') c = deals();
-  else if (path.startsWith('/product/')) {
-    c = product(path.split('/')[2]);
-  }
-  else {
-    c = `
-    <section class="wrap">
-      <div class="empty">
-        <h2>Страница не найдена</h2>
-        <a class="btn" href="#/">На главную</a>
-      </div>
-    </section>`;
-  }
-
-  document.getElementById('app').innerHTML = c;
-  window.scrollTo(0, 0);
-}
-
-window.addEventListener('hashchange', render);
-
-loadProducts();
+    <section class="section">
+      <h1>Корзина</h1
