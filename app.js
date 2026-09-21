@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://qzwuptmldyksjlcynrcy.supabase.co';
-const SUPABASE_KEY = sb_publishable_41R3PSkaLqwvgrnRg38spw_0ytE-OPD;
+const SUPABASE_KEY = 'sb_publishable_41R3PSkaLqwvgrnRg38spw_0ytE-OPD';
 
 let supabaseClient;
 let products = [];
@@ -265,4 +265,240 @@ function cartPage() {
 
   return `
     <section class="section">
-      <h1>Корзина</h1
+      <h1>Корзина</h1>
+
+      <div class="cart-list">
+        ${cart.map((p, i) => `
+          <div class="cart-item">
+            <div>
+              <b>${p.icon} ${p.name}</b>
+              <div>${p.platform} · ${p.region}</div>
+            </div>
+
+            <strong>${money(p.price)}</strong>
+
+            <button
+              class="smallbtn"
+              onclick="removeFromCart(${i})"
+            >
+              Удалить
+            </button>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="checkout-total">
+        <h2>Итого: ${money(total)}</h2>
+        <a class="btn" href="#/checkout">
+          Перейти к оформлению
+        </a>
+      </div>
+    </section>
+  `;
+}
+
+function checkout() {
+  if (!cart.length) {
+    return `
+      <section class="section">
+        <h1>Оформление заказа</h1>
+        <p>Корзина пуста.</p>
+      </section>
+    `;
+  }
+
+  const total = cart.reduce((sum, p) => sum + p.price, 0);
+
+  return `
+    <section class="section">
+      <h1>Оформление заказа</h1>
+
+      <div class="checkout">
+        <label>
+          Имя
+          <input id="customerName" type="text" placeholder="Ваше имя">
+        </label>
+
+        <label>
+          Email
+          <input id="email" type="email" placeholder="you@example.com">
+        </label>
+
+        <h2>К оплате: ${money(total)}</h2>
+
+        <button class="btn" onclick="createOrder()">
+          Создать заказ
+        </button>
+
+        <p>
+          Сейчас создаётся тестовый заказ.
+          Онлайн-оплата будет подключена следующим этапом.
+        </p>
+      </div>
+    </section>
+  `;
+}
+
+async function createOrder() {
+  const email = document.getElementById('email')?.value.trim();
+  const name = document.getElementById('customerName')?.value.trim();
+
+  if (!email || !email.includes('@')) {
+    toast('Укажи корректный email');
+    return;
+  }
+
+  if (!cart.length) {
+    toast('Корзина пуста');
+    return;
+  }
+
+  const items = cart.map(p => ({
+    product_id: p.id
+  }));
+
+  try {
+    toast('Создаём заказ...');
+
+    const { data, error } =
+      await supabaseClient.functions.invoke(
+        'create-order',
+        {
+          body: {
+            email,
+            name,
+            items
+          }
+        }
+      );
+
+    if (error) {
+      console.error(error);
+      toast('Ошибка создания заказа');
+      return;
+    }
+
+    if (!data?.success) {
+      toast(data?.error || 'Не удалось создать заказ');
+      return;
+    }
+
+    localStorage.setItem(
+      'kf_last_order',
+      JSON.stringify(data)
+    );
+
+    cart = [];
+    saveCart();
+
+    location.hash = '/orders';
+
+    toast('Заказ создан');
+  } catch (err) {
+    console.error(err);
+    toast('Ошибка соединения');
+  }
+}
+
+function ordersPage() {
+  const order = JSON.parse(
+    localStorage.getItem('kf_last_order') || 'null'
+  );
+
+  if (!order) {
+    return `
+      <section class="section">
+        <h1>Мои заказы</h1>
+        <p>Заказов пока нет.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="section">
+      <h1>Мои заказы</h1>
+
+      <div class="order">
+        <h3>Заказ #${order.order_id}</h3>
+        <p>Статус: ${order.status}</p>
+        <p>Сумма: ${money(order.total)}</p>
+      </div>
+    </section>
+  `;
+}
+
+function supportPage() {
+  return `
+    <section class="section">
+      <h1>Поддержка</h1>
+
+      <p>
+        Если возникли проблемы с заказом,
+        напишите нам на email поддержки.
+      </p>
+    </section>
+  `;
+}
+
+function dealsPage() {
+  const deals = products.filter(
+    p => p.old && p.old > p.price
+  );
+
+  return `
+    <section class="section">
+      <h1>Скидки</h1>
+
+      <div class="grid">
+        ${
+          deals.length
+            ? deals.map(card).join('')
+            : '<p>Сейчас скидок нет.</p>'
+        }
+      </div>
+    </section>
+  `;
+}
+
+function render() {
+  const app = document.getElementById('app');
+
+  if (!app) return;
+
+  const hash = location.hash || '#/';
+  const parts = hash.replace(/^#\/?/, '').split('/');
+
+  const route = parts[0] || '';
+  const id = parts[1];
+
+  if (route === '') {
+    app.innerHTML = home();
+  } else if (route === 'catalog') {
+    app.innerHTML = catalog();
+  } else if (route === 'product') {
+    app.innerHTML = productPage(id);
+  } else if (route === 'cart') {
+    app.innerHTML = cartPage();
+  } else if (route === 'checkout') {
+    app.innerHTML = checkout();
+  } else if (route === 'orders') {
+    app.innerHTML = ordersPage();
+  } else if (route === 'support') {
+    app.innerHTML = supportPage();
+  } else if (route === 'deals') {
+    app.innerHTML = dealsPage();
+  } else {
+    app.innerHTML = home();
+  }
+
+  updateCartCount();
+}
+
+window.addEventListener('hashchange', render);
+
+if (initSupabase()) {
+  render();
+  loadProducts();
+} else {
+  render();
+}
