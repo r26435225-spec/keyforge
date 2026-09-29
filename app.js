@@ -400,7 +400,78 @@ if (data.confirmation_url) {
 }
 }
 
+  async function createOrder() {
+  ...
+}
+async function createOrder() {
+  const email = document.getElementById('email')?.value.trim();
+  const name = document.getElementById('customerName')?.value.trim();
+
+  if (!email || !email.includes('@')) {
+    toast('Укажи корректный email');
+    return;
+  }
+
+  if (!cart.length) {
+    toast('Корзина пуста');
+    return;
+  }
+
+  const items = cart.map(p => ({
+    product_id: p.id
+  }));
+
+  try {
+    toast('Создаём заказ...');
+
+    const { data, error } =
+      await supabaseClient.functions.invoke(
+        'create-order',
+        {
+          body: {
+            email,
+            name,
+            items
+          }
+        }
+      );
+
+    if (error) {
+      console.error(error);
+      toast('Ошибка создания заказа');
+      return;
+    }
+
+    if (!data?.success) {
+      toast(data?.error || 'Не удалось создать заказ');
+      return;
+    }
+
+    localStorage.setItem(
+      'kf_last_order',
+      JSON.stringify(data)
+    );
+
+    cart = [];
+    saveCart();
+
+    if (data.confirmation_url) {
+      toast('Переходим к оплате...');
+
+      window.location.href = data.confirmation_url;
+    } else {
+      toast('Ссылка на оплату не получена');
+    }
+
+  } catch (err) {
+    console.error(err);
+    toast('Ошибка соединения');
+  }
+}
 function ordersPage() {
+  ...
+}
+  
   const order = JSON.parse(
     localStorage.getItem('kf_last_order') || 'null'
   );
