@@ -383,21 +383,21 @@ async function createOrder() {
       return;
     }
 
-    localStorage.setItem(
-      'kf_last_order',
-      JSON.stringify(data)
-    );
+localStorage.setItem(
+  'kf_last_order',
+  JSON.stringify(data)
+);
 
-    cart = [];
-    saveCart();
+cart = [];
+saveCart();
 
-    location.hash = '/orders';
+if (data.confirmation_url) {
+  toast('Переходим к оплате...');
 
-    toast('Заказ создан');
-  } catch (err) {
-    console.error(err);
-    toast('Ошибка соединения');
-  }
+  window.location.href = data.confirmation_url;
+} else {
+  toast('Ссылка на оплату не получена');
+}
 }
 
 function ordersPage() {
